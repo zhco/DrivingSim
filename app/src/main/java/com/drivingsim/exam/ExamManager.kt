@@ -117,6 +117,42 @@ class ExamManager {
     /**
      * 科目三成绩
      */
+
+    /** HUD 兼容属性 */
+    val score: Int
+        get() {
+            val s2Total = getSubject2Total().score
+            val s3Total = getSubject3Total().score
+            return if (currentPhase.name.startsWith("S2")) s2Total else s3Total
+        }
+
+    val currentItem: String
+        get() = when (currentPhase) {
+            Phase.S2_REVERSE_PARKING -> "倒车入库"
+            Phase.S2_SIDE_PARKING -> "侧方停车"
+            Phase.S2_HILL_START -> "坡道起步"
+            Phase.S2_CURVE_DRIVING -> "曲线行驶"
+            Phase.S2_RIGHT_ANGLE -> "直角转弯"
+            Phase.S3_START_OFF -> "起步"
+            Phase.S3_ROAD_DRIVING -> "道路驾驶"
+            Phase.S3_PARKING -> "靠边停车"
+            Phase.S2_FINISHED, Phase.S3_FINISHED -> "考试结束"
+            else -> "等待开始"
+        }
+
+    val deductions: List<String>
+        get() {
+            val list = mutableListOf<String>()
+            if (currentPhase.name.startsWith("S2")) {
+                s2Results.values.forEach { r -> r.deductions.forEach { list.add(it.description) } }
+            } else {
+                s3Deductions.forEach { list.add(it.description) }
+            }
+            if (midwayStopCount > 0) list.add("中途停车 x$midwayStopCount (-5x$midwayStopCount)")
+            return list
+        }
+
+
     fun getSubject3Total(): ExamResult {
         var total = 100
         s3Deductions.forEach { total += it.points }
