@@ -57,8 +57,8 @@ class MainActivity : Activity() {
 
         // 启动渲染循环
         glSurfaceView.setEGLContextClientVersion(3)
-        glSurfaceView.setRenderer(engine)
         glSurfaceView.renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+        glSurfaceView.setRenderer(engine)
     }
 
     override fun onPause() {
