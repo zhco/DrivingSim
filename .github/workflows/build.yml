@@ -30,12 +30,6 @@ jobs:
       - name: Accept Android licenses
         run: yes | sdkmanager --licenses || true
 
-      - name: Generate placeholder resources
-        run: |
-          python3 resources/generate_resources.py
-          mkdir -p app/src/main/assets
-          cp -r resources/placeholder_assets/* app/src/main/assets/
-
       - name: Build Debug APK
         run: gradle assembleDebug --no-daemon --stacktrace
 
