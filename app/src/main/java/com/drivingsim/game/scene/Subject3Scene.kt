@@ -1,12 +1,12 @@
 package com.drivingsim.game.scene
 
-import javax.vecmath.Vector3f
-
 /**
  * 科目三城市道路场景
  * 包含直线行驶、变道、超车、通过路口、学校区域、公交站台、靠边停车等路段
  */
 class Subject3Scene : Scene() {
+
+    override val name = "科目三"
 
     // 路线特征点（世界坐标，X=横向，Z=行驶方向）
 	data class RoadPoint(val x: Float, val z: Float, val width: Float = 7f)
