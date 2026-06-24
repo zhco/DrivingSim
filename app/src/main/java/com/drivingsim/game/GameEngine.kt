@@ -25,8 +25,18 @@ class GameEngine : GLSurfaceView.Renderer {
     lateinit var scene: com.drivingsim.game.scene.Scene
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
-        renderer.init()
-        world.init()
+        try {
+            renderer.init()
+            android.util.Log.i("GameEngine", "renderer.init() OK")
+        } catch (e: Exception) {
+            android.util.Log.e("GameEngine", "renderer.init() FAILED", e)
+        }
+        try {
+            world.init()
+            android.util.Log.i("GameEngine", "world.init() OK")
+        } catch (e: Exception) {
+            android.util.Log.e("GameEngine", "world.init() FAILED", e)
+        }
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
