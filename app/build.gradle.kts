@@ -42,8 +42,7 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("com.google.android.material:material:1.11.0")
 
-    // OpenGL
-    implementation("androidx.opengl:opengl:1.1.0")
+    // OpenGL (built into Android, no extra dependency)
 
     // Physics - JBullet (packaged as AAR in libs/)
     implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.jar", "*.aar"))))
