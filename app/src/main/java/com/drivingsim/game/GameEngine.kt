@@ -34,21 +34,32 @@ class GameEngine : GLSurfaceView.Renderer {
     }
 
     override fun onDrawFrame(gl: GL10?) {
-        val now = System.nanoTime()
-        val delta = ((now - lastFrameTime) / 1_000_000_000.0f).coerceAtMost(0.05f)
-        lastFrameTime = now
-        accumulator += delta
+        try {
+            val now = System.nanoTime()
+            val delta = ((now - lastFrameTime) / 1_000_000_000.0f).coerceAtMost(0.05f)
+            lastFrameTime = now
+            accumulator += delta
 
-        while (accumulator >= FIXED_DT) {
-            // 核心步进顺序
-            val input = inputAggregator.poll()           // 1. 采集传感器+触屏
-            world.applyInput(input, FIXED_DT)            // 2. 物理世界响应输入
-            world.step(FIXED_DT)                         // 3. 物理步进
-            examManager.evaluate(world.vehicle, scene)   // 4. 考试评判
-            scene.update(FIXED_DT, world.vehicle)        // 5. 场景逻辑
-            accumulator -= FIXED_DT
+            while (accumulator >= FIXED_DT) {
+                try {
+                    val input = inputAggregator.poll()
+                    world.applyInput(input, FIXED_DT)
+                    world.step(FIXED_DT)
+                    examManager.evaluate(world.vehicle, scene)
+                    scene.update(FIXED_DT, world.vehicle)
+                } catch (e: Exception) {
+                    android.util.Log.e("GameEngine", "Physics step error", e)
+                }
+                accumulator -= FIXED_DT
+            }
+
+            try {
+                renderer.draw(world, scene)
+            } catch (e: Exception) {
+                android.util.Log.e("GameEngine", "Render error", e)
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("GameEngine", "onDrawFrame crash", e)
         }
-
-        renderer.draw(world, scene)
     }
 }
