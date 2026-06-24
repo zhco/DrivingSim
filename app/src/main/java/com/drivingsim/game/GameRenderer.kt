@@ -135,8 +135,6 @@ class GameRenderer {
         GLES30.glBindVertexArray(vao)
         GLES30.glDrawArrays(GLES30.GL_LINE_LOOP, 0, poly.size)
         GLES30.glBindVertexArray(0)
-        GLES30.glDeleteVertexArrays(1, intArrayOf(vao), 0)
-        GLES30.glDeleteBuffers(1, intArrayOf(vao), 0)
     }
 
     // ============== 折线 ==============
@@ -159,8 +157,6 @@ class GameRenderer {
         GLES30.glLineWidth(3f)
         GLES30.glDrawArrays(GLES30.GL_LINE_STRIP, 0, line.size)
         GLES30.glBindVertexArray(0)
-        GLES30.glDeleteVertexArrays(1, intArrayOf(vao), 0)
-        GLES30.glDeleteBuffers(1, intArrayOf(vao), 0)
     }
 
     // ============== 车辆 ==============
@@ -231,8 +227,6 @@ class GameRenderer {
         GLES30.glBindVertexArray(vao)
         GLES30.glDrawArrays(GLES30.GL_TRIANGLES, 0, segs * 2)
         GLES30.glBindVertexArray(0)
-        GLES30.glDeleteVertexArrays(1, intArrayOf(vao), 0)
-        GLES30.glDeleteBuffers(1, intArrayOf(vao), 0)
     }
 
     // ============== 锥桶 ==============
@@ -259,8 +253,6 @@ class GameRenderer {
         GLES30.glBindVertexArray(vao)
         GLES30.glDrawElements(GLES30.GL_TRIANGLES, indices.size, GLES30.GL_UNSIGNED_SHORT, 0)
         GLES30.glBindVertexArray(0)
-        // 清理（简化：不删，反正每帧重建）
-        GLES30.glDeleteVertexArrays(1, intArrayOf(vao), 0)
     }
 
     private fun drawArrays(verts: FloatArray) {
@@ -268,8 +260,6 @@ class GameRenderer {
         GLES30.glBindVertexArray(vao)
         GLES30.glDrawArrays(GLES30.GL_TRIANGLES, 0, verts.size / 3)
         GLES30.glBindVertexArray(0)
-        GLES30.glDeleteVertexArrays(1, intArrayOf(vao), 0)
-        GLES30.glDeleteBuffers(1, intArrayOf(vao), 0)
     }
 
     private fun createVAO(verts: FloatArray): Int {
@@ -291,7 +281,6 @@ class GameRenderer {
     private fun createIndexedVAO(verts: FloatArray, indices: ShortArray): Int {
         val vaoArr = IntArray(1)
         GLES30.glGenVertexArrays(1, vaoArr, 0)
-        GLES30.glGenBuffers(2, IntArray(2), 0)
         val vboArr = IntArray(2)
         GLES30.glGenBuffers(2, vboArr, 0)
         GLES30.glBindVertexArray(vaoArr[0])
