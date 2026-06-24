@@ -224,12 +224,12 @@ class GameRenderer {
             val a1 = (i * 2.0 * Math.PI / segs).toFloat()
             val a2 = ((i + 1) * 2.0 * Math.PI / segs).toFloat()
             val base = i * 6
-            wheelVerts[base] = (wr * Math.cos(a1)).toFloat()
+            wheelVerts[base] = (wr * Math.cos(a1.toDouble())).toFloat()
             wheelVerts[base+1] = -wtw
-            wheelVerts[base+2] = (wr * Math.sin(a1)).toFloat()
-            wheelVerts[base+3] = (wr * Math.cos(a2)).toFloat()
+            wheelVerts[base+2] = (wr * Math.sin(a1.toDouble())).toFloat()
+            wheelVerts[base+3] = (wr * Math.cos(a2.toDouble())).toFloat()
             wheelVerts[base+4] = -wtw
-            wheelVerts[base+5] = (wr * Math.sin(a2)).toFloat()
+            wheelVerts[base+5] = (wr * Math.sin(a2.toDouble())).toFloat()
         }
 
         for ((wx, wz, wy) in wheelPositions) {
