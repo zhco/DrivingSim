@@ -76,7 +76,7 @@ class Subject3Scene : Scene() {
     override fun isComplete(): Boolean = false
 
     override fun checkCollision(vehicle: Vehicle): CollisionResult =
-        CollisionResult(false, emptyList())
+        CollisionResult(false, false)
 
     override fun reset() {}
 }
