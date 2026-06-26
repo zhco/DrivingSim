@@ -1,92 +1,104 @@
 package com.drivingsim.game
 
 import android.opengl.GLES20
-import android.opengl.Matrix
 import android.util.Log
 import com.drivingsim.game.scene.Scene
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.nio.FloatBuffer
 
+/**
+ * Minimal renderer - renders a colored triangle to verify GL pipeline.
+ * Once confirmed working, we can expand back to full scene.
+ */
 class GameRenderer {
 
     companion object {
         private const val TAG = "GameRenderer"
     }
 
-    private val viewMatrix = FloatArray(16)
-    private val projMatrix = FloatArray(16)
-    private val mvpMatrix = FloatArray(16)
-    private val modelMatrix = FloatArray(16)
-    private val tempMatrix = FloatArray(16)
-
     private var program = 0
-    private var mvpHandle = -1
-    private var colorHandle = -1
-    private var posHandle = -1
     private var ready = false
-    private var width = 0
-    private var height = 0
+    private val triangleVerts: FloatBuffer
+
+    init {
+        // Pre-build triangle data
+        val verts = floatArrayOf(
+            -0.5f, -0.5f, 0f,
+             0.5f, -0.5f, 0f,
+             0.0f,  0.5f, 0f
+        )
+        val buf = ByteBuffer.allocateDirect(verts.size * 4)
+            .order(ByteOrder.nativeOrder())
+            .asFloatBuffer()
+        buf.put(verts).position(0)
+        triangleVerts = buf
+    }
 
     fun init() {
-        Log.i(TAG, "init() start")
-        GLES20.glClearColor(0.0f, 0.15f, 0.05f, 1.0f)
-        GLES20.glEnable(GLES20.GL_DEPTH_TEST)
+        Log.i(TAG, "init() enter")
+        try {
+            GLES20.glClearColor(0.1f, 0.15f, 0.25f, 1f)
 
-        val vsSrc = """
-            uniform mat4 uMVP;
-            attribute vec3 aPos;
-            void main() {
-                gl_Position = uMVP * vec4(aPos, 1.0);
+            val vsSrc = """
+                attribute vec3 aPos;
+                void main() {
+                    gl_Position = vec4(aPos, 1.0);
+                }
+            """.trimIndent()
+
+            val fsSrc = """
+                precision mediump float;
+                void main() {
+                    gl_FragColor = vec4(1.0, 0.5, 0.0, 1.0);
+                }
+            """.trimIndent()
+
+            val vs = compileShader(GLES20.GL_VERTEX_SHADER, vsSrc)
+            val fs = compileShader(GLES20.GL_FRAGMENT_SHADER, fsSrc)
+
+            if (vs == 0 || fs == 0) {
+                Log.e(TAG, "Shader compile failed vs=$vs fs=$fs")
+                return
             }
-        """.trimIndent()
 
-        val fsSrc = """
-            precision mediump float;
-            uniform vec4 uColor;
-            void main() {
-                gl_FragColor = uColor;
+            program = GLES20.glCreateProgram()
+            if (program == 0) {
+                Log.e(TAG, "glCreateProgram returned 0")
+                GLES20.glDeleteShader(vs)
+                GLES20.glDeleteShader(fs)
+                return
             }
-        """.trimIndent()
 
-        val vs = loadShader(GLES20.GL_VERTEX_SHADER, vsSrc)
-        val fs = loadShader(GLES20.GL_FRAGMENT_SHADER, fsSrc)
+            GLES20.glAttachShader(program, vs)
+            GLES20.glAttachShader(program, fs)
+            GLES20.glLinkProgram(program)
 
-        if (vs == 0 || fs == 0) {
-            Log.e(TAG, "Shader compilation failed, init aborted")
-            return
-        }
+            val status = IntArray(1)
+            GLES20.glGetProgramiv(program, GLES20.GL_LINK_STATUS, status, 0)
+            if (status[0] == 0) {
+                val log = GLES20.glGetProgramInfoLog(program)
+                Log.e(TAG, "Link failed: $log")
+                GLES20.glDeleteShader(vs)
+                GLES20.glDeleteShader(fs)
+                GLES20.glDeleteProgram(program)
+                program = 0
+                return
+            }
 
-        program = GLES20.glCreateProgram()
-        GLES20.glAttachShader(program, vs)
-        GLES20.glAttachShader(program, fs)
-        GLES20.glLinkProgram(program)
-
-        val linked = IntArray(1)
-        GLES20.glGetProgramiv(program, GLES20.GL_LINK_STATUS, linked, 0)
-        if (linked[0] == 0) {
-            Log.e(TAG, "Program link fail: " + GLES20.glGetProgramInfoLog(program))
-            GLES20.glDeleteProgram(program)
-            program = 0
-        }
-
-        GLES20.glDeleteShader(vs)
-        GLES20.glDeleteShader(fs)
-
-        if (program != 0) {
-            mvpHandle = GLES20.glGetUniformLocation(program, "uMVP")
-            colorHandle = GLES20.glGetUniformLocation(program, "uColor")
-            posHandle = GLES20.glGetAttribLocation(program, "aPos")
+            GLES20.glDeleteShader(vs)
+            GLES20.glDeleteShader(fs)
             ready = true
-            Log.i(TAG, "init() done, program=" + program)
-        } else {
-            Log.e(TAG, "init() FAILED - program is 0")
+            Log.i(TAG, "init() OK program=$program")
+        } catch (e: Exception) {
+            Log.e(TAG, "init() exception", e)
         }
     }
 
-    private fun loadShader(type: Int, source: String): Int {
+    private fun compileShader(type: Int, source: String): Int {
         val shader = GLES20.glCreateShader(type)
         if (shader == 0) {
-            Log.e(TAG, "glCreateShader failed for type=$type")
+            Log.e(TAG, "glCreateShader($type) returned 0")
             return 0
         }
         GLES20.glShaderSource(shader, source)
@@ -94,7 +106,8 @@ class GameRenderer {
         val ok = IntArray(1)
         GLES20.glGetShaderiv(shader, GLES20.GL_COMPILE_STATUS, ok, 0)
         if (ok[0] == 0) {
-            Log.e(TAG, "Shader compile fail: " + GLES20.glGetShaderInfoLog(shader))
+            val log = GLES20.glGetShaderInfoLog(shader)
+            Log.e(TAG, "Shader compile error: $log")
             GLES20.glDeleteShader(shader)
             return 0
         }
@@ -102,207 +115,35 @@ class GameRenderer {
     }
 
     fun resize(w: Int, h: Int) {
-        width = w; height = h
         GLES20.glViewport(0, 0, w, h)
-        val ratio = w.toFloat() / h.coerceAtLeast(1)
-        Matrix.perspectiveM(projMatrix, 0, 60f, ratio, 0.5f, 200f)
     }
 
     fun draw(world: GameWorld, scene: Scene) {
+        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
+
         if (!ready || program == 0) {
-            // Fallback: just clear screen
-            GLES20.glClearColor(0.1f, 0.1f, 0.15f, 1f)
-            GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
-            return
+            return // Just show clear color (dark blue)
         }
 
-        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
-        GLES20.glUseProgram(program)
+        try {
+            GLES20.glUseProgram(program)
 
-        val v = world.vehicle
-        val camX = (v.posX - 8.0 * Math.sin(v.yaw)).toFloat()
-        val camY = 5f
-        val camZ = (v.posZ - 8.0 * Math.cos(v.yaw)).toFloat()
-        Matrix.setLookAtM(viewMatrix, 0, camX, camY, camZ, v.posX.toFloat(), 0f, v.posZ.toFloat(), 0f, 1f, 0f)
+            val posHandle = GLES20.glGetAttribLocation(program, "aPos")
+            if (posHandle < 0) return
 
-        drawGround()
-        drawPolygon(scene.getBoundaryPolygon(), 1f, 1f, 1f, 0.8f)
-        drawPolyline(scene.getCenterLine(), 1f, 1f, 0f, 0.8f)
-        for ((ox, oz) in scene.getObstacles()) {
-            drawCone(ox, oz)
+            triangleVerts.position(0)
+            GLES20.glVertexAttribPointer(posHandle, 3, GLES20.GL_FLOAT, false, 0, triangleVerts)
+            GLES20.glEnableVertexAttribArray(posHandle)
+            GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, 3)
+            GLES20.glDisableVertexAttribArray(posHandle)
+
+            // Check for errors
+            val err = GLES20.glGetError()
+            if (err != GLES20.GL_NO_ERROR) {
+                Log.w(TAG, "GL error: 0x${Integer.toHexString(err)}")
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "draw() exception", e)
         }
-        drawVehicle(v)
-
-        // Check for GL errors (debug)
-        val err = GLES20.glGetError()
-        if (err != GLES20.GL_NO_ERROR) {
-            Log.w(TAG, "GL error: 0x" + Integer.toHexString(err))
-        }
-    }
-
-    private fun combineMVP() {
-        Matrix.multiplyMM(tempMatrix, 0, projMatrix, 0, viewMatrix, 0)
-        Matrix.multiplyMM(mvpMatrix, 0, tempMatrix, 0, modelMatrix, 0)
-        GLES20.glUniformMatrix4fv(mvpHandle, 1, false, mvpMatrix, 0)
-    }
-
-    private fun setColor(r: Float, g: Float, b: Float, a: Float) {
-        GLES20.glUniform4f(colorHandle, r, g, b, a)
-    }
-
-    private fun drawTriangles(verts: FloatArray, count: Int) {
-        val buf = ByteBuffer.allocateDirect(verts.size * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
-        buf.put(verts).position(0)
-        GLES20.glVertexAttribPointer(posHandle, 3, GLES20.GL_FLOAT, false, 0, buf)
-        GLES20.glEnableVertexAttribArray(posHandle)
-        GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, count)
-        GLES20.glDisableVertexAttribArray(posHandle)
-    }
-
-    private fun drawLineLoop(verts: FloatArray, count: Int) {
-        val buf = ByteBuffer.allocateDirect(verts.size * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
-        buf.put(verts).position(0)
-        GLES20.glVertexAttribPointer(posHandle, 3, GLES20.GL_FLOAT, false, 0, buf)
-        GLES20.glEnableVertexAttribArray(posHandle)
-        GLES20.glDrawArrays(GLES20.GL_LINE_LOOP, 0, count)
-        GLES20.glDisableVertexAttribArray(posHandle)
-    }
-
-    private fun drawLineStrip(verts: FloatArray, count: Int) {
-        val buf = ByteBuffer.allocateDirect(verts.size * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
-        buf.put(verts).position(0)
-        GLES20.glVertexAttribPointer(posHandle, 3, GLES20.GL_FLOAT, false, 0, buf)
-        GLES20.glEnableVertexAttribArray(posHandle)
-        GLES20.glDrawArrays(GLES20.GL_LINE_STRIP, 0, count)
-        GLES20.glDisableVertexAttribArray(posHandle)
-    }
-
-    private fun drawGround() {
-        Matrix.setIdentityM(modelMatrix, 0)
-        combineMVP()
-        setColor(0.12f, 0.22f, 0.10f, 1f)
-        val s = 50f
-        val verts = floatArrayOf(-s, 0f, -s, s, 0f, -s, s, 0f, s, -s, 0f, -s, s, 0f, s, -s, 0f, s)
-        drawTriangles(verts, 6)
-    }
-
-    private fun drawPolygon(poly: List<Pair<Double, Double>>, r: Float, g: Float, b: Float, a: Float) {
-        if (poly.size < 2) return
-        Matrix.setIdentityM(modelMatrix, 0)
-        combineMVP()
-        setColor(r, g, b, a)
-        val verts = FloatArray(poly.size * 3)
-        for (i in poly.indices) {
-            verts[i*3] = poly[i].first.toFloat()
-            verts[i*3+1] = 0.02f
-            verts[i*3+2] = poly[i].second.toFloat()
-        }
-        drawLineLoop(verts, poly.size)
-    }
-
-    private fun drawPolyline(line: List<Pair<Double, Double>>, r: Float, g: Float, b: Float, a: Float) {
-        if (line.size < 2) return
-        Matrix.setIdentityM(modelMatrix, 0)
-        combineMVP()
-        setColor(r, g, b, a)
-        val verts = FloatArray(line.size * 3)
-        for (i in line.indices) {
-            verts[i*3] = line[i].first.toFloat()
-            verts[i*3+1] = 0.04f
-            verts[i*3+2] = line[i].second.toFloat()
-        }
-        drawLineStrip(verts, line.size)
-    }
-
-    private fun drawVehicle(v: com.drivingsim.vehicle.Vehicle) {
-        Matrix.setIdentityM(modelMatrix, 0)
-        Matrix.translateM(modelMatrix, 0, v.posX.toFloat(), 0.3f, v.posZ.toFloat())
-        Matrix.rotateM(modelMatrix, 0, Math.toDegrees(v.yaw).toFloat(), 0f, 1f, 0f)
-        combineMVP()
-        setColor(0.9f, 0.85f, 0.8f, 1f)
-
-        val l = 2.5f; val w = 0.95f; val h = 1.5f
-        val verts = floatArrayOf(
-            -w, 0f, -l,  w, 0f, -l,  w, h, -l,  -w, h, -l,
-             w, 0f,  l, -w, 0f,  l, -w, h,  l,  w, h,  l,
-            -w, 0f, -l, -w, 0f,  l, -w, h,  l, -w, h, -l,
-             w, 0f,  l,  w, 0f, -l,  w, h, -l,  w, h,  l,
-            -w, h, -l,  w, h, -l,  w, h,  l, -w, h,  l,
-        )
-        val idx = shortArrayOf(
-            0,1,2, 0,2,3, 4,5,6, 4,6,7,
-            8,9,10, 8,10,11, 12,13,14, 12,14,15,
-            16,17,18, 16,18,19
-        )
-        val vBuf = ByteBuffer.allocateDirect(verts.size * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
-        vBuf.put(verts).position(0)
-        GLES20.glVertexAttribPointer(posHandle, 3, GLES20.GL_FLOAT, false, 0, vBuf)
-        GLES20.glEnableVertexAttribArray(posHandle)
-
-        // Use glDrawArrays (triangulated) instead of glDrawElements to avoid client-side index buffer issues
-        val triVerts = FloatArray(idx.size * 3)
-        for (i in idx.indices) {
-            triVerts[i*3] = verts[idx[i]*3]
-            triVerts[i*3+1] = verts[idx[i]*3+1]
-            triVerts[i*3+2] = verts[idx[i]*3+2]
-        }
-        val tBuf = ByteBuffer.allocateDirect(triVerts.size * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
-        tBuf.put(triVerts).position(0)
-        GLES20.glVertexAttribPointer(posHandle, 3, GLES20.GL_FLOAT, false, 0, tBuf)
-        GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, idx.size)
-
-        GLES20.glDisableVertexAttribArray(posHandle)
-
-        // Wheels
-        setColor(0.08f, 0.08f, 0.08f, 1f)
-        val wr = 0.35f; val ww = 0.25f; val segs = 8
-        val wheelVerts = FloatArray(segs * 2 * 3)
-        for (i in 0 until segs) {
-            val a1 = (i * 2.0 * Math.PI / segs).toFloat()
-            val a2 = ((i + 1) * 2.0 * Math.PI / segs).toFloat()
-            val b = i * 6
-            wheelVerts[b] = (wr * Math.cos(a1.toDouble())).toFloat()
-            wheelVerts[b+1] = -ww; wheelVerts[b+2] = (wr * Math.sin(a1.toDouble())).toFloat()
-            wheelVerts[b+3] = (wr * Math.cos(a2.toDouble())).toFloat()
-            wheelVerts[b+4] = -ww; wheelVerts[b+5] = (wr * Math.sin(a2.toDouble())).toFloat()
-        }
-        val wheelPositions = arrayOf(
-            Triple(-w-0.1f, 0f, -l+0.6f), Triple(w+0.1f, 0f, -l+0.6f),
-            Triple(-w-0.1f, 0f,  l-0.6f), Triple(w+0.1f, 0f,  l-0.6f)
-        )
-        for ((wx, wz, wy) in wheelPositions) {
-            Matrix.setIdentityM(modelMatrix, 0)
-            Matrix.translateM(modelMatrix, 0, v.posX.toFloat(), 0f, v.posZ.toFloat())
-            Matrix.rotateM(modelMatrix, 0, Math.toDegrees(v.yaw).toFloat(), 0f, 1f, 0f)
-            Matrix.translateM(modelMatrix, 0, wx, wy, wz)
-            combineMVP()
-            drawTriangles(wheelVerts, segs * 2)
-        }
-    }
-
-    private fun drawCone(x: Double, z: Double) {
-        Matrix.setIdentityM(modelMatrix, 0)
-        Matrix.translateM(modelMatrix, 0, x.toFloat(), 0f, z.toFloat())
-        combineMVP()
-        setColor(1f, 0.3f, 0f, 1f)
-        val verts = floatArrayOf(
-            0f, 0.8f, 0f,
-            -0.15f, 0f, -0.15f, 0.15f, 0f, -0.15f,
-            0.15f, 0f, 0.15f, -0.15f, 0f, 0.15f
-        )
-        // Convert indexed to flat array for glDrawArrays
-        val idx = shortArrayOf(0,1,2, 0,2,3, 0,3,4, 0,4,1)
-        val triVerts = FloatArray(idx.size * 3)
-        for (i in idx.indices) {
-            triVerts[i*3] = verts[idx[i]*3]
-            triVerts[i*3+1] = verts[idx[i]*3+1]
-            triVerts[i*3+2] = verts[idx[i]*3+2]
-        }
-        val tBuf = ByteBuffer.allocateDirect(triVerts.size * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
-        tBuf.put(triVerts).position(0)
-        GLES20.glVertexAttribPointer(posHandle, 3, GLES20.GL_FLOAT, false, 0, tBuf)
-        GLES20.glEnableVertexAttribArray(posHandle)
-        GLES20.glDrawArrays(GLES20.GL_TRIANGLES, 0, idx.size)
-        GLES20.glDisableVertexAttribArray(posHandle)
     }
 }
