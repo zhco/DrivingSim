@@ -84,6 +84,14 @@ class GameRenderer {
         Matrix.perspectiveM(projMatrix, 0, 60f, w.toFloat()/h.coerceAtLeast(1), 0.5f, 200f)
     }
 
+    var cameraMode = 0
+    val cameraModes = arrayOf("后方跟随", "驾驶员视角", "左后视镜", "右后视镜", "前保险杠")
+
+    fun nextCamera(): String {
+        cameraMode = (cameraMode + 1) % cameraModes.size
+        return cameraModes[cameraMode]
+    }
+
     fun draw(world: GameWorld, scene: Scene) {
         if (!ready || program == 0) {
             GLES20.glClearColor(0.1f, 0.1f, 0.15f, 1f)
@@ -94,13 +102,37 @@ class GameRenderer {
         GLES20.glUseProgram(program)
 
         val v = world.vehicle
-        // Camera: behind and above the vehicle
-        val camDist = 12.0
-        val camHeight = 6.0
-        val camX = (v.posX - camDist * Math.sin(v.yaw)).toFloat()
-        val camY = camHeight.toFloat()
-        val camZ = (v.posZ - camDist * Math.cos(v.yaw)).toFloat()
-        Matrix.setLookAtM(viewMatrix, 0, camX, camY, camZ, v.posX.toFloat(), 0f, v.posZ.toFloat(), 0f, 1f, 0f)
+        val yaw=v.yaw; val px=v.posX.toFloat(); val pz=v.posZ.toFloat()
+        val sinY=Math.sin(yaw).toFloat(); val cosY=Math.cos(yaw).toFloat()
+
+        val camDist=12.0; val camHeight=6.0
+        when (cameraMode) {
+            0 -> { // 后方跟随（默认）
+                val cx=(v.posX-camDist*Math.sin(yaw)).toFloat()
+                val cy=camHeight.toFloat()
+                val cz=(v.posZ-camDist*Math.cos(yaw)).toFloat()
+                Matrix.setLookAtM(viewMatrix,0,cx,cy,cz,px,0f,pz,0f,1f,0f)
+            }
+            1 -> { // 驾驶员视角 - 车内前挡风玻璃
+                val dx=px+1.0f*sinY; val dz=pz+1.0f*cosY
+                val cx=px-0.3f*sinY; val cz=pz-0.3f*cosY
+                Matrix.setLookAtM(viewMatrix,0,cx,1.2f,cz,dx,0.9f,dz,0f,1f,0f)
+            }
+            2 -> { // 左后视镜
+                val lx=px-cosY*1.2f; val lz=pz+sinY*1.2f
+                val cx=lx-sinY*0.5f; val cz=lz-cosY*0.5f
+                Matrix.setLookAtM(viewMatrix,0,cx,1.0f,cz,lx,0.8f,lz,0f,1f,0f)
+            }
+            3 -> { // 右后视镜
+                val rx=px+cosY*1.2f; val rz=pz-sinY*1.2f
+                val cx=rx-sinY*0.5f; val cz=rz-cosY*0.5f
+                Matrix.setLookAtM(viewMatrix,0,cx,1.0f,cz,rx,0.8f,rz,0f,1f,0f)
+            }
+            4 -> { // 前保险杠
+                val fx=px+1.5f*sinY; val fz=pz+1.5f*cosY
+                Matrix.setLookAtM(viewMatrix,0,fx,0.2f,fz,fx+sinY*10f,0.2f,fz+cosY*10f,0f,1f,0f)
+            }
+        }
 
         drawGround()
         drawPolygon(scene.getBoundaryPolygon(), 1f, 1f, 1f, 0.8f)
