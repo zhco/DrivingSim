@@ -31,6 +31,7 @@ class InputAggregator(
     // --- 按钮状态 ---
     private var turnSignal = 0     // -1=左, 0=关, 1=右
     private var handbrake = false
+    var cameraToggle = false       // 视角切换请求
 
     // --- 按钮区域定义（归一化坐标 0-1） ---
     private data class ButtonZone(val x: Float, val y: Float, val w: Float, val h: Float)
@@ -47,6 +48,7 @@ class InputAggregator(
          4 to ButtonZone(0.46f, 0.35f, 0.06f, 0.10f),
          5 to ButtonZone(0.52f, 0.35f, 0.06f, 0.10f),
     )
+    private val cameraZone     = ButtonZone(0.15f, 0.05f, 0.08f, 0.06f)
     private val turnLeftZone   = ButtonZone(0.20f, 0.85f, 0.10f, 0.08f)
     private val turnRightZone  = ButtonZone(0.35f, 0.85f, 0.10f, 0.08f)
 
@@ -113,6 +115,7 @@ class InputAggregator(
         if (e.actionMasked == MotionEvent.ACTION_DOWN) {
             if (hit(turnLeftZone, nx, ny))  turnSignal = if (turnSignal == -1) 0 else -1
             if (hit(turnRightZone, nx, ny)) turnSignal = if (turnSignal == 1) 0 else 1
+            if (hit(cameraZone, nx, ny)) cameraToggle = true
         }
     }
 
