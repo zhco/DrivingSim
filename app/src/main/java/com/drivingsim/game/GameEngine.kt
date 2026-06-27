@@ -6,6 +6,7 @@ import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
 class GameEngine : GLSurfaceView.Renderer {
+
     companion object {
         private const val TAG = "GameEngine"
         const val TARGET_FPS = 60
@@ -22,13 +23,13 @@ class GameEngine : GLSurfaceView.Renderer {
     lateinit var scene: com.drivingsim.game.scene.Scene
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
-        Log.i(TAG, "onSurfaceCreated enter")
-        try { renderer.init(); Log.i(TAG, "renderer OK") } catch (e: Exception) { Log.e(TAG, "renderer fail", e) }
-        try { world.init(); Log.i(TAG, "world OK") } catch (e: Exception) { Log.e(TAG, "world fail", e) }
+        Log.i(TAG, "onSurfaceCreated")
+        try { renderer.init(); Log.i(TAG, "renderer OK") } catch (e: Exception) { Log.e(TAG, "renderer FAIL", e) }
+        try { world.init(); Log.i(TAG, "world OK") } catch (e: Exception) { Log.e(TAG, "world FAIL", e) }
     }
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
-        try { renderer.resize(width, height) } catch (e: Exception) { Log.e(TAG, "resize fail", e) }
+        try { renderer.resize(width, height) } catch (e: Exception) { Log.e(TAG, "resize FAIL", e) }
     }
 
     override fun onDrawFrame(gl: GL10?) {
@@ -44,10 +45,10 @@ class GameEngine : GLSurfaceView.Renderer {
                     world.step(FIXED_DT)
                     examManager.evaluate(world.vehicle, scene)
                     scene.update(FIXED_DT, world.vehicle)
-                } catch (e: Exception) { Log.e(TAG, "step err", e) }
+                } catch (e: Exception) { Log.e(TAG, "step error", e) }
                 accumulator -= FIXED_DT
             }
-            try { renderer.draw(world, scene) } catch (e: Exception) { Log.e(TAG, "draw err", e) }
-        } catch (e: Exception) { Log.e(TAG, "frame err", e) }
+            try { renderer.draw(world, scene) } catch (e: Exception) { Log.e(TAG, "draw error", e) }
+        } catch (e: Exception) { Log.e(TAG, "frame crash", e) }
     }
 }
