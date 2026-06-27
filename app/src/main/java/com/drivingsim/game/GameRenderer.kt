@@ -24,12 +24,10 @@ class GameRenderer {
     private var colorHandle = -1
     private var posHandle = -1
     private var ready = false
-    private var width = 0
-    private var height = 0
 
     fun init() {
-        Log.i(TAG, "init() start")
-        GLES20.glClearColor(0.0f, 0.15f, 0.05f, 1.0f)
+        Log.i(TAG, "init()")
+        GLES20.glClearColor(0.53f, 0.81f, 0.92f, 1.0f)  // 天蓝色背景
         GLES20.glEnable(GLES20.GL_DEPTH_TEST)
 
         val vsSrc = """
@@ -50,11 +48,7 @@ class GameRenderer {
 
         val vs = loadShader(GLES20.GL_VERTEX_SHADER, vsSrc)
         val fs = loadShader(GLES20.GL_FRAGMENT_SHADER, fsSrc)
-
-        if (vs == 0 || fs == 0) {
-            Log.e(TAG, "Shader compilation failed")
-            return
-        }
+        if (vs == 0 || fs == 0) { Log.e(TAG, "Shader fail"); return }
 
         program = GLES20.glCreateProgram()
         GLES20.glAttachShader(program, vs)
@@ -62,11 +56,7 @@ class GameRenderer {
         GLES20.glLinkProgram(program)
         val linked = IntArray(1)
         GLES20.glGetProgramiv(program, GLES20.GL_LINK_STATUS, linked, 0)
-        if (linked[0] == 0) {
-            Log.e(TAG, "Link fail: " + GLES20.glGetProgramInfoLog(program))
-            GLES20.glDeleteProgram(program)
-            program = 0
-        }
+        if (linked[0] == 0) { Log.e(TAG, "Link: "+GLES20.glGetProgramInfoLog(program)); GLES20.glDeleteProgram(program); program = 0; }
         GLES20.glDeleteShader(vs)
         GLES20.glDeleteShader(fs)
 
@@ -75,30 +65,23 @@ class GameRenderer {
             colorHandle = GLES20.glGetUniformLocation(program, "uColor")
             posHandle = GLES20.glGetAttribLocation(program, "aPos")
             ready = true
-            Log.i(TAG, "init() OK program=" + program)
         }
     }
 
     private fun loadShader(type: Int, source: String): Int {
-        val shader = GLES20.glCreateShader(type)
-        if (shader == 0) return 0
-        GLES20.glShaderSource(shader, source)
-        GLES20.glCompileShader(shader)
+        val s = GLES20.glCreateShader(type)
+        if (s == 0) return 0
+        GLES20.glShaderSource(s, source)
+        GLES20.glCompileShader(s)
         val ok = IntArray(1)
-        GLES20.glGetShaderiv(shader, GLES20.GL_COMPILE_STATUS, ok, 0)
-        if (ok[0] == 0) {
-            Log.e(TAG, "Shader fail: " + GLES20.glGetShaderInfoLog(shader))
-            GLES20.glDeleteShader(shader)
-            return 0
-        }
-        return shader
+        GLES20.glGetShaderiv(s, GLES20.GL_COMPILE_STATUS, ok, 0)
+        if (ok[0] == 0) { GLES20.glDeleteShader(s); return 0 }
+        return s
     }
 
     fun resize(w: Int, h: Int) {
-        width = w; height = h
         GLES20.glViewport(0, 0, w, h)
-        val ratio = w.toFloat() / h.coerceAtLeast(1)
-        Matrix.perspectiveM(projMatrix, 0, 60f, ratio, 0.5f, 200f)
+        Matrix.perspectiveM(projMatrix, 0, 60f, w.toFloat()/h.coerceAtLeast(1), 0.5f, 200f)
     }
 
     fun draw(world: GameWorld, scene: Scene) {
@@ -111,14 +94,17 @@ class GameRenderer {
         GLES20.glUseProgram(program)
 
         val v = world.vehicle
-        val camX = (v.posX - 8.0 * Math.sin(v.yaw)).toFloat()
-        val camY = 5f
-        val camZ = (v.posZ - 8.0 * Math.cos(v.yaw)).toFloat()
+        // Camera: behind and above the vehicle
+        val camDist = 12.0
+        val camHeight = 6.0
+        val camX = (v.posX - camDist * Math.sin(v.yaw)).toFloat()
+        val camY = camHeight.toFloat()
+        val camZ = (v.posZ - camDist * Math.cos(v.yaw)).toFloat()
         Matrix.setLookAtM(viewMatrix, 0, camX, camY, camZ, v.posX.toFloat(), 0f, v.posZ.toFloat(), 0f, 1f, 0f)
 
         drawGround()
         drawPolygon(scene.getBoundaryPolygon(), 1f, 1f, 1f, 0.8f)
-        drawPolyline(scene.getCenterLine(), 1f, 1f, 0f, 0.8f)
+        drawPolyline(scene.getCenterLine(), 1f, 0.84f, 0f, 0.9f)
         for ((ox, oz) in scene.getObstacles()) drawCone(ox, oz)
         drawVehicle(v)
     }
@@ -142,6 +128,14 @@ class GameRenderer {
         GLES20.glDisableVertexAttribArray(posHandle)
     }
 
+    private fun drawGround() {
+        Matrix.setIdentityM(modelMatrix, 0)
+        combineMVP()
+        setColor(0.47f, 0.53f, 0.43f, 1f)  // 灰绿色
+        val s = 30f
+        drawTriangles(floatArrayOf(-s, 0f, -s, s, 0f, -s, s, 0f, s, -s, 0f, -s, s, 0f, s, -s, 0f, s), 6)
+    }
+
     private fun drawLineLoop(verts: FloatArray, count: Int) {
         val buf = ByteBuffer.allocateDirect(verts.size * 4).order(ByteOrder.nativeOrder()).asFloatBuffer()
         buf.put(verts).position(0)
@@ -158,14 +152,6 @@ class GameRenderer {
         GLES20.glEnableVertexAttribArray(posHandle)
         GLES20.glDrawArrays(GLES20.GL_LINE_STRIP, 0, count)
         GLES20.glDisableVertexAttribArray(posHandle)
-    }
-
-    private fun drawGround() {
-        Matrix.setIdentityM(modelMatrix, 0)
-        combineMVP()
-        setColor(0.12f, 0.22f, 0.10f, 1f)
-        val s = 50f
-        drawTriangles(floatArrayOf(-s, 0f, -s, s, 0f, -s, s, 0f, s, -s, 0f, -s, s, 0f, s, -s, 0f, s), 6)
     }
 
     private fun drawPolygon(poly: List<Pair<Double, Double>>, r: Float, g: Float, b: Float, a: Float) {
@@ -201,48 +187,56 @@ class GameRenderer {
         Matrix.translateM(modelMatrix, 0, v.posX.toFloat(), 0.3f, v.posZ.toFloat())
         Matrix.rotateM(modelMatrix, 0, Math.toDegrees(v.yaw).toFloat(), 0f, 1f, 0f)
         combineMVP()
-        setColor(0.9f, 0.85f, 0.8f, 1f)
 
         val l = 2.5f; val w = 0.95f; val h = 1.5f
-        val ih = arrayOf(
-            0,1,2, 0,2,3, 4,5,6, 4,6,7,
-            8,9,10, 8,10,11, 12,13,14, 12,14,15,
-            16,17,18, 16,18,19
-        )
+
+        // 车身 (红色)
+        setColor(0.85f, 0.15f, 0.1f, 1f)
         val vv = floatArrayOf(
             -w, 0f, -l,  w, 0f, -l,  w, h, -l,  -w, h, -l,
              w, 0f,  l, -w, 0f,  l, -w, h,  l,  w, h,  l,
             -w, 0f, -l, -w, 0f,  l, -w, h,  l, -w, h, -l,
-             w, 0f,  l,  w, 0f, -l,  w, h, -l,  w, h,  l,
-            -w, h, -l,  w, h, -l,  w, h,  l, -w, h,  l,
+             w, 0f,  l,  w, 0f, -l,  w, h, -l,  w, h,  l
         )
-        val tv = FloatArray(ih.size * 3)
+        val ih = intArrayOf(0,1,2,0,2,3, 4,5,6,4,6,7, 8,9,10,8,10,11, 12,13,14,12,14,15)
+        val tv = FloatArray(ih.size*3)
         for (i in ih.indices) { tv[i*3]=vv[ih[i]*3]; tv[i*3+1]=vv[ih[i]*3+1]; tv[i*3+2]=vv[ih[i]*3+2] }
         drawTriangles(tv, ih.size)
 
-        // Wheels
-        setColor(0.08f, 0.08f, 0.08f, 1f)
+        // 车顶 (深红)
+        setColor(0.6f, 0.08f, 0.05f, 1f)
+        val rh = 0.1f; val rw = 0.1f; val rl = 0.3f
+        val rv = floatArrayOf(
+            -w+rw, h, -l+rl,  w-rw, h, -l+rl,  w-rw, h+0.35f, -l+rl,  -w+rw, h+0.35f, -l+rl,
+             w-rw, h,  l-rl, -w+rw, h,  l-rl, -w+rw, h+0.35f,  l-rl,  w-rw, h+0.35f,  l-rl,
+            -w+rw, h, -l+rl, -w+rw, h,  l-rl, -w+rw, h+0.35f,  l-rl, -w+rw, h+0.35f, -l+rl,
+             w-rw, h,  l-rl,  w-rw, h, -l+rl,  w-rw, h+0.35f, -l+rl,  w-rw, h+0.35f,  l-rl,
+            -w+rw, h+0.35f, -l+rl,  w-rw, h+0.35f, -l+rl,  w-rw, h+0.35f,  l-rl, -w+rw, h+0.35f,  l-rl
+        )
+        val rtv = FloatArray(ih.size*3)
+        for (i in ih.indices) { rtv[i*3]=rv[ih[i]*3]; rtv[i*3+1]=rv[ih[i]*3+1]; rtv[i*3+2]=rv[ih[i]*3+2] }
+        drawTriangles(rtv, ih.size)
+
+        // 轮子 (深灰)
+        setColor(0.25f, 0.25f, 0.25f, 1f)
         val wr = 0.35f; val ww = 0.25f; val segs = 8
-        val wv = FloatArray(segs * 2 * 3)
+        val wv = FloatArray(segs*2*3)
         for (i in 0 until segs) {
-            val a1 = (i * 2.0 * Math.PI / segs).toFloat()
-            val a2 = ((i + 1) * 2.0 * Math.PI / segs).toFloat()
-            val b = i * 6
-            wv[b] = (wr * Math.cos(a1.toDouble())).toFloat()
-            wv[b+1] = -ww; wv[b+2] = (wr * Math.sin(a1.toDouble())).toFloat()
-            wv[b+3] = (wr * Math.cos(a2.toDouble())).toFloat()
-            wv[b+4] = -ww; wv[b+5] = (wr * Math.sin(a2.toDouble())).toFloat()
+            val a1=(i*2.0*Math.PI/segs).toFloat(); val a2=((i+1)*2.0*Math.PI/segs).toFloat()
+            val b=i*6
+            wv[b]=wr* Math.cos(a1.toDouble()).toFloat(); wv[b+1]=-ww; wv[b+2]=wr* Math.sin(a1.toDouble()).toFloat()
+            wv[b+3]=wr* Math.cos(a2.toDouble()).toFloat(); wv[b+4]=-ww; wv[b+5]=wr* Math.sin(a2.toDouble()).toFloat()
         }
         for ((wx, wy, wz) in arrayOf(
-            Triple(-w-0.1f, 0f, -l+0.6f), Triple(w+0.1f, 0f, -l+0.6f),
-            Triple(-w-0.1f, 0f,  l-0.6f), Triple(w+0.1f, 0f,  l-0.6f)
+            Triple(-w-0.1f, 0.35f, -l+0.6f), Triple(w+0.1f, 0.35f, -l+0.6f),
+            Triple(-w-0.1f, 0.35f,  l-0.6f), Triple(w+0.1f, 0.35f,  l-0.6f)
         )) {
             Matrix.setIdentityM(modelMatrix, 0)
             Matrix.translateM(modelMatrix, 0, v.posX.toFloat(), 0f, v.posZ.toFloat())
             Matrix.rotateM(modelMatrix, 0, Math.toDegrees(v.yaw).toFloat(), 0f, 1f, 0f)
             Matrix.translateM(modelMatrix, 0, wx, wy, wz)
             combineMVP()
-            drawTriangles(wv, segs * 2)
+            drawTriangles(wv, segs*2)
         }
     }
 
@@ -250,10 +244,10 @@ class GameRenderer {
         Matrix.setIdentityM(modelMatrix, 0)
         Matrix.translateM(modelMatrix, 0, x.toFloat(), 0f, z.toFloat())
         combineMVP()
-        setColor(1f, 0.3f, 0f, 1f)
+        setColor(1f, 0.5f, 0f, 1f)
         val vv = floatArrayOf(0f, 0.8f, 0f, -0.15f, 0f, -0.15f, 0.15f, 0f, -0.15f, 0.15f, 0f, 0.15f, -0.15f, 0f, 0.15f)
         val ih = shortArrayOf(0,1,2, 0,2,3, 0,3,4, 0,4,1)
-        val tv = FloatArray(ih.size * 3)
+        val tv = FloatArray(ih.size*3)
         for (i in ih.indices) { tv[i*3]=vv[ih[i]*3]; tv[i*3+1]=vv[ih[i]*3+1]; tv[i*3+2]=vv[ih[i]*3+2] }
         drawTriangles(tv, ih.size)
     }
