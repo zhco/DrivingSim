@@ -42,7 +42,6 @@ class GameEngine : GLSurfaceView.Renderer {
                 try {
                     val input = inputAggregator.poll()
                     world.applyInput(input, FIXED_DT)
-                    if (inputAggregator.cameraToggle) { inputAggregator.cameraToggle = false; renderer.nextCamera() }
                     world.step(FIXED_DT)
                     examManager.evaluate(world.vehicle, scene)
                     scene.update(FIXED_DT, world.vehicle)
