@@ -222,29 +222,36 @@ class GameRenderer {
         GLES20.glGetIntegerv(GLES20.GL_VIEWPORT, mainVp, 0)
 
         // === Render mirror views (FBO) ===
+        var mirrorsOk = false
         if (cameraMode == 0 && mirrorsReady) {
-            for (mi in 0..2) {
-                GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, mirrorFBOs[mi])
-                GLES20.glViewport(0, 0, mirrorSize, mirrorSize)
-                GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
+            try {
+                for (mi in 0..2) {
+                    GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, mirrorFBOs[mi])
+                    GLES20.glViewport(0, 0, mirrorSize, mirrorSize)
+                    GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
 
-                when (mi) {
-                    0 -> { // Left mirror — look left-backward
-                        val mx = px - cosY * 1.0f; val mz = pz + sinY * 1.0f
-                        val tx = mx - sinY * 15f; val tz = mz - cosY * 15f
-                        Matrix.setLookAtM(mirrorViewMatrix, 0, mx, 1.0f, mz, tx, 0.6f, tz, 0f, 1f, 0f)
+                    when (mi) {
+                        0 -> { // Left mirror — look left-backward
+                            val mx = px - cosY * 1.0f; val mz = pz + sinY * 1.0f
+                            val tx = mx - sinY * 15f; val tz = mz - cosY * 15f
+                            Matrix.setLookAtM(mirrorViewMatrix, 0, mx, 1.0f, mz, tx, 0.6f, tz, 0f, 1f, 0f)
+                        }
+                        1 -> { // Right mirror — look right-backward
+                            val mx = px + cosY * 1.0f; val mz = pz - sinY * 1.0f
+                            val tx = mx - sinY * 15f; val tz = mz - cosY * 15f
+                            Matrix.setLookAtM(mirrorViewMatrix, 0, mx, 1.0f, mz, tx, 0.6f, tz, 0f, 1f, 0f)
+                        }
+                        2 -> { // Rearview mirror — look straight back
+                            val tx = px - sinY * 20f; val tz = pz - cosY * 20f
+                            Matrix.setLookAtM(mirrorViewMatrix, 0, px, 1.4f, pz, tx, 1f, tz, 0f, 1f, 0f)
+                        }
                     }
-                    1 -> { // Right mirror — look right-backward
-                        val mx = px + cosY * 1.0f; val mz = pz - sinY * 1.0f
-                        val tx = mx - sinY * 15f; val tz = mz - cosY * 15f
-                        Matrix.setLookAtM(mirrorViewMatrix, 0, mx, 1.0f, mz, tx, 0.6f, tz, 0f, 1f, 0f)
-                    }
-                    2 -> { // Rearview mirror — look straight back
-                        val tx = px - sinY * 20f; val tz = pz - cosY * 20f
-                        Matrix.setLookAtM(mirrorViewMatrix, 0, px, 1.4f, pz, tx, 1f, tz, 0f, 1f, 0f)
-                    }
+                    renderMirrorScene(world, scene, mirrorViewMatrix, mirrorProjMatrix)
                 }
-                renderMirrorScene(world, scene, mirrorViewMatrix, mirrorProjMatrix)
+                mirrorsOk = true
+            } catch (e: Exception) {
+                Log.e(TAG, "Mirror FBO render failed, disabling: " + e.message)
+                mirrorsReady = false
             }
         }
 
@@ -293,7 +300,7 @@ class GameRenderer {
 
         if (cockpitMode) {
             drawCockpitInterior(px, pz, sinY, cosY, vMat, pMat)
-            if (mirrorsReady) drawMirrorQuads(px, pz, sinY, cosY, vMat, pMat)
+            if (mirrorsOk) drawMirrorQuads(px, pz, sinY, cosY, vMat, pMat)
         }
     }
 
