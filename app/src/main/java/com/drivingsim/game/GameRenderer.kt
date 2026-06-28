@@ -132,11 +132,11 @@ class GameRenderer {
             texPosHandle = GLES20.glGetAttribLocation(texProgram, "aPos")
         }
 
-        setupMirrors()
+        //setupMirrors()  // FBO disabled due to device incompatibility
         ready = true
     }
 
-    private fun setupMirrors() {
+    private fun //setupMirrors()  // FBO disabled due to device incompatibility {
         for (i in 0..2) {
             // Texture
             val tex = IntArray(1)
@@ -171,8 +171,8 @@ class GameRenderer {
         GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0)
         GLES20.glBindRenderbuffer(GLES20.GL_RENDERBUFFER, 0)
-        mirrorsReady = true
-        Log.i(TAG, "FBO mirrors ready")
+        mirrorsReady = false  // kept false until FBO proven working
+        mirrorsReady = true; Log.i(TAG, "FBO mirrors ready")
     }
 
     private fun loadShader(type: Int, source: String): Int {
