@@ -27,7 +27,7 @@ class HudOverlay(context: Context) : View(context) {
     // 考试状态
     var examManager: ExamManager? = null
     var examMode: Int = 0          // 0=自由, 1=科二, 2=科三
-    var cameraLabel: String = "后方跟随"
+    var cameraLabel: String = "驾驶舱"
 
     // 控件区域（横屏）
     private val pedalZone = RectF()
