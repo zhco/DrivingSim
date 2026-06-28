@@ -132,11 +132,11 @@ class GameRenderer {
             texPosHandle = GLES20.glGetAttribLocation(texProgram, "aPos")
         }
 
-        //setupMirrors()  // FBO disabled due to device incompatibility
+        // setupMirrors()  // FBO disabled due to device incompatibility
         ready = true
     }
 
-    private fun //setupMirrors()  // FBO disabled due to device incompatibility {
+    private fun setupMirrors() {
         for (i in 0..2) {
             // Texture
             val tex = IntArray(1)
