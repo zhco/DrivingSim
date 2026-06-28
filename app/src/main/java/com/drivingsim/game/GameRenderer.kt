@@ -269,7 +269,7 @@ class GameRenderer {
 
         if (cockpitMode) {
             drawCockpitInterior(px, pz, sinY, cosY, vMat, pMat)
-            if (mirrorsOk) drawMirrorQuads(px, pz, sinY, cosY, vMat, pMat)
+            drawMirrorQuads(px, pz, sinY, cosY, vMat, pMat)
         }
     }
 
