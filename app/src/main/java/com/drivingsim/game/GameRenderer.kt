@@ -132,7 +132,7 @@ class GameRenderer {
             texPosHandle = GLES20.glGetAttribLocation(texProgram, "aPos")
         }
 
-        // setupMirrors()  // FBO disabled due to device incompatibility
+        setupMirrors()
         ready = true
     }
 
@@ -165,13 +165,20 @@ class GameRenderer {
 
             val status = GLES20.glCheckFramebufferStatus(GLES20.GL_FRAMEBUFFER)
             if (status != GLES20.GL_FRAMEBUFFER_COMPLETE) {
-                Log.e(TAG, "FBO $i incomplete: $status")
+                Log.e(TAG, "FBO $i incomplete: $status — aborting mirrors")
+                mirrorsReady = false
+                GLES20.glDeleteFramebuffers(1, IntArray(1) { fb[0] }, 0)
+                GLES20.glDeleteTextures(1, IntArray(1) { tex[0] }, 0)
+                GLES20.glDeleteRenderbuffers(1, IntArray(1) { rbuf[0] }, 0)
+                GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
+                return
             }
         }
         GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, 0)
         GLES20.glBindRenderbuffer(GLES20.GL_RENDERBUFFER, 0)
-        mirrorsReady = true; Log.i(TAG, "FBO mirrors ready")
+        mirrorsReady = true
+        Log.i(TAG, "FBO mirrors ready")
     }
 
     private fun loadShader(type: Int, source: String): Int {
@@ -220,9 +227,32 @@ class GameRenderer {
         val mainVp = IntArray(4)
         GLES20.glGetIntegerv(GLES20.GL_VIEWPORT, mainVp, 0)
 
-        // === Mirror FBO rendering temporarily disabled ===
-        // FBO incompatibility on some devices causes blank screen; mirrors drawn as dark quads
-        val mirrorsOk = false
+        // === Render mirror views (FBO) ===
+        if (cameraMode == 0 && mirrorsReady) {
+            for (mi in 0..2) {
+                GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, mirrorFBOs[mi])
+                GLES20.glViewport(0, 0, mirrorSize, mirrorSize)
+                GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
+
+                when (mi) {
+                    0 -> { // Left mirror — look left-backward
+                        val mx = px - cosY * 1.0f; val mz = pz + sinY * 1.0f
+                        val tx = mx - sinY * 15f; val tz = mz - cosY * 15f
+                        Matrix.setLookAtM(mirrorViewMatrix, 0, mx, 1.0f, mz, tx, 0.6f, tz, 0f, 1f, 0f)
+                    }
+                    1 -> { // Right mirror — look right-backward
+                        val mx = px + cosY * 1.0f; val mz = pz - sinY * 1.0f
+                        val tx = mx - sinY * 15f; val tz = mz - cosY * 15f
+                        Matrix.setLookAtM(mirrorViewMatrix, 0, mx, 1.0f, mz, tx, 0.6f, tz, 0f, 1f, 0f)
+                    }
+                    2 -> { // Rearview mirror — look straight back
+                        val tx = px - sinY * 20f; val tz = pz - cosY * 20f
+                        Matrix.setLookAtM(mirrorViewMatrix, 0, px, 1.4f, pz, tx, 1f, tz, 0f, 1f, 0f)
+                    }
+                }
+                renderMirrorScene(world, scene, mirrorViewMatrix, mirrorProjMatrix)
+            }
+        }
 
         // === Main view ===
         GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0)
@@ -269,7 +299,7 @@ class GameRenderer {
 
         if (cockpitMode) {
             drawCockpitInterior(px, pz, sinY, cosY, vMat, pMat)
-            // drawMirrorQuads disabled (FBO inactive, GL state conflict)
+            if (mirrorsReady) drawMirrorQuads(px, pz, sinY, cosY, vMat, pMat)
         }
     }
 
